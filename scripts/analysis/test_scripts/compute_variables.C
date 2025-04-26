@@ -24,7 +24,7 @@
 
 #include <iostream>
 
-void compute_dx_dy(std::string config, std::string target, std::string pass){
+void compute_variables(std::string config, std::string target, std::string pass){
     // Validate config
     std::vector<std::string> valid_configs = {"kin2", "kin3", "kin4a", "kin4b"};
     if (std::find(valid_configs.begin(), valid_configs.end(), config) == valid_configs.end()) {
@@ -48,39 +48,28 @@ void compute_dx_dy(std::string config, std::string target, std::string pass){
         std::cerr << "Allowed configurations are: pass1, pass2.\n";
         return;
     }
-  
+
     double ebeam;
-    double MN = 0.9385;
-    double HCAL_angle;
-    double HCAL_distance = 17.0;
+    double MN = 0.9385; 
 
     // Set experiment name
     std::string exp_name;
     if (config == "kin2") {
         exp_name = "GEN2";
-	ebeam = 4.291;
-	HCAL_angle = 34.7 * TMath::DegToRad();
+	ebeam = 4.30;
     }
     else if (config == "kin3") {
          exp_name = "GEN3";
-	 ebeam = 6.373;
-	 HCAL_angle = 21.6 * TMath::DegToRad();
+	 ebeam = 6.40;
     }
     else if (config == "kin4a") {
          exp_name = "GEN4";
-	 ebeam = 8.448;
-	 HCAL_angle = 18.0 * TMath::DegToRad();
+	 ebeam = 8.50;
     }
     else if (config == "kin4b") {
          exp_name = "GEN4b";
-	 ebeam = 8.448;
-	 HCAL_angle = 18.0 * TMath::DegToRad();
+	 ebeam = 8.50;
     }
-
-    TVector3 HCAL_vector(-HCAL_distance*TMath::Sin(HCAL_angle), 0.0, HCAL_distance*TMath::Cos(HCAL_angle));
-    TVector3 HCAL_unitvector_z(TMath::Sin(HCAL_angle), 0.0, TMath::Cos(HCAL_angle));
-    TVector3 HCAL_unitvector_y(TMath::Sin(TMath::Pi() - HCAL_angle), 0.0, TMath::Cos(TMath::Pi() - HCAL_angle));
-    TVector3 HCAL_unitvector_x = HCAL_unitvector_y.Cross(HCAL_unitvector_z);
     
     std::string dir_path = "../../../data/raw/" + pass + "/"  + config + "_" + target + "/";
     std::string file_name = "QE_data_" + exp_name + "_sbs100p_nucleon_np" + ".root";
@@ -108,17 +97,15 @@ void compute_dx_dy(std::string config, std::string target, std::string pass){
     tree->SetBranchAddress("HALLA_p", &ebeam_epics);
     
     // BigBite variables
-    double keprime_x, keprime_y, keprime_z, eprime_she, eprime_pse, e_over_p, target_x, target_y, target_z;
+    double keprime_x, keprime_y, keprime_z, eprime_she, eprime_pse, e_over_p, tr_vz;
 
     tree->SetBranchAddress("bb.tr.px", &keprime_x);
     tree->SetBranchAddress("bb.tr.py", &keprime_y);
     tree->SetBranchAddress("bb.tr.pz", &keprime_z);
     tree->SetBranchAddress("bb.ps.e", &eprime_she);
     tree->SetBranchAddress("bb.sh.e", &eprime_pse);
+    tree->SetBranchAddress("bb.tr.vz", &tr_vz);
     tree->SetBranchAddress("bb.etot_over_p", &e_over_p);
-    tree->SetBranchAddress("bb.tr.vx", &target_x);
-    tree->SetBranchAddress("bb.tr.vy", &target_y);
-    tree->SetBranchAddress("bb.tr.vz", &target_z);
 
     // Hcal variables
     double Hcalx, Hcaly, Hcale;
@@ -127,74 +114,72 @@ void compute_dx_dy(std::string config, std::string target, std::string pass){
     tree->SetBranchAddress("sbs.hcal.y", &Hcaly);
     tree->SetBranchAddress("sbs.hcal.e", &Hcale);
 
+    // Pre-Defining Histograms for Calculations results
+    TH1D* h_keprime_mag = new TH1D("h_keprime_mag", "Track Momentum p;p;Counts", 100, 0.5, 3.5);
+    TH1D* h_etheta = new TH1D("h_etheta", "etheta ;etheta;Counts", 100, 0.4, 0.7);
+    TH1D* h_ephi = new TH1D("h_ephi", "ephi;ephi;Counts", 100, -0.6, 0.6);
+    TH1D* h_W2 = new TH1D("h_W2", "W2;W2;Counts", 100, -6.0, 13.0);
+    TH1D* h_Q2 = new TH1D("h_Q2", "Q2;Q2;Counts", 100, -6.0, 9.0);
+    TH1D* h_W2_cut = new TH1D("h_W2_cut", "W2_cut;W2;Counts", 100, -6.0, 13.0);
+    TH1D* h_Q2_cut = new TH1D("h_Q2_cut", "Q2_cut;Q2;Counts", 100, -6.0, 9.0);
+    TH1D* h_W2_tr = new TH1D("h_W2_tr", "W2_tr;W2;Counts", 100, -6.0, 13.0);
+    TH1D* h_Q2_tr = new TH1D("h_Q2_tr", "Q2_tr;Q2;Counts", 100, -6.0, 9.0);
+    TH1D* h_W2_tr_cut = new TH1D("h_W2_tr_cut", "W2_tr;W2;Counts", 100, -6.0, 13.0);
+    TH1D* h_Q2_tr_cut = new TH1D("h_Q2_tr_cut", "Q2_tr;Q2;Counts", 100, -6.0, 9.0);
+    TH2D* h_mag_etheta = new TH2D("h_mag_etheta", "p vs etheta;etheta,p", 100, 0.4, 0.7, 100, 0.5, 3.5);
     
 
-    // Pre-Defining Histograms for Calculations results
-    TH2D* h_dx_dy = new TH2D("h_dx_dy", "dx vs dy;dy;dx", 100, -11.0, 2.0, 100, -4.5, 2.0);
-    TH2D* h_W2_dy = new TH2D("h_W2_dy", "W2 vs dy;dy;W2", 100, -11.0, 2.0, 100, -2.0, 9.0);
-    TH2D* h_dx_dy_cut = new TH2D("h_dx_dy_cut", "dx vs dy", 100, -1.0, 1.0, 100, -4.5, 2.0);
-    TH1D* h_dx = new TH1D("h_dx", "dx", 100, -4.5, 2.0);
-    TH1D* h_dx_cut = new TH1D("h_dx_cut", "dx", 100, -4.5, 2.0);
-			     
     //Loop over entries of the tree
     Long64_t Nentries = tree->GetEntries();
     int last_percent = -1;
     for (Long64_t i = 0; i < Nentries; ++i) {
       tree->GetEntry(i);
-      if (TMath::Abs(target_z) <= 0.27 && TMath::Abs(target_x) <= 0.0115 && TMath::Abs(target_y) <= 0.0115 && Hcale > 0.025 && eprime_pse > 0.2 && ebeam_epics/1000 > 0) {
+      if (abs(tr_vz) <= 0.27 && Hcale > 0.025 && eprime_pse > 0.2 && ebeam_epics/1000 > 0) {
 	  // Defining momentum 3-vector
 	  TVector3 keprime_vec(keprime_x,keprime_y,keprime_z);
-	  TVector3 target_vec(target_x,target_y,target_z);
 
 	  double keprime_mag = keprime_vec.Mag();
 	  double etheta = keprime_vec.Theta();
 	  double ephi = keprime_vec.Phi();
-	  double eprime = keprime_vec.Mag();
-	  // double ebeam = ebeam_epics/1000;
+	  double eprime = eprime_she + eprime_pse;
 
 	  TLorentzVector keprime(keprime_x,keprime_y,keprime_z,eprime);
-	  TLorentzVector ke(0.0,0.0,ebeam,ebeam);
+	  TLorentzVector keprime_tr(keprime_x,keprime_y,keprime_z,keprime_vec.Mag());
+	  TLorentzVector ke(0.0,0.0,ebeam_epics/1000,ebeam_epics/1000);
 	  TLorentzVector P(0.0,0.0,0.0,MN);
-	  TLorentzVector q = ke - keprime;
-	  TLorentzVector Pprime = q + P;
+	  TLorentzVector Pprime;
+	  TLorentzVector q;
+	  TLorentzVector Pprime_tr;
+	  TLorentzVector q_tr;
+      
+	  q = ke - keprime;
+	  Pprime = q + P;
 
-	  double eprime_el = ebeam / (1 + ebeam/MN * (1 - TMath::Cos(etheta)));
-	  TVector3 keprime_el_vec(eprime_el*TMath::Cos(ephi)*TMath::Sin(etheta),eprime_el*TMath::Sin(ephi)*TMath::Sin(etheta),eprime_el*TMath::Cos(etheta));
-	  TLorentzVector keprime_el(keprime_el_vec.X(),keprime_el_vec.Y(),keprime_el_vec.Z(),eprime_el);
-
-	  TLorentzVector Pprime_el = ke - keprime_el + P;
-
-	  double nu;
-	  nu = q.E();
-
-
-	  TVector3 Pprime_vec = Pprime.Vect();
-	  TVector3 Pprime_unitvec = Pprime_vec.Unit();
-
-          double w = (HCAL_vector - target_vec).Dot(HCAL_unitvector_z) / (Pprime_unitvec.Dot(HCAL_unitvector_z));
-	  TVector3 w_vec = target_vec + w*Pprime_unitvec;
-	  TVector3 D_vec = w_vec - HCAL_vector;
-
-	  double Hcaly_exp = D_vec.Dot(HCAL_unitvector_y);
-	  double Hcalx_exp = D_vec.Dot(HCAL_unitvector_x);
-
-	  double dx = Hcalx - Hcalx_exp;
-	  double dy = Hcaly - Hcaly_exp;
-
-	  
+	  q_tr = ke - keprime_tr;
+	  Pprime_tr = q_tr + P;
 
 	  double W2 = Pprime.Mag2();
 	  double Q2 = -q.Mag2();
 
-	  if (e_over_p >= 0.85 && e_over_p <= 1.15 && Q2 >= 2.0 && W2 < 2.0 && TMath::Abs(dy) < 0.5) {
-	    h_dx_dy_cut->Fill(dy,dx);
-	    h_dx_cut->Fill(dx);
-	  }
+	  double W2_tr = Pprime_tr.Mag2();
+	  double Q2_tr = -q_tr.Mag2();
 
-	  h_dx_dy->Fill(dy,dx);
-	  h_dx->Fill(dx);
-	  h_W2_dy->Fill(dy,W2);
+	  if (e_over_p >= 0.85 && e_over_p <= 1.15 && Q2_tr >= 8.0) {
+	    h_W2_cut->Fill(W2);
+	    h_Q2_cut->Fill(Q2);
+	    h_W2_tr_cut->Fill(W2_tr);
+	    h_Q2_tr_cut->Fill(Q2_tr);
+	  }
       
+
+	  h_keprime_mag->Fill(keprime_mag);
+	  h_etheta->Fill(etheta);
+	  h_ephi->Fill(ephi);
+	  h_mag_etheta->Fill(etheta,eprime);
+	  h_W2->Fill(W2);
+	  h_Q2->Fill(Q2);
+	  h_W2_tr->Fill(W2_tr);
+	  h_Q2_tr->Fill(Q2_tr);
 
 	  int percent = static_cast<int>(100.0 * i / Nentries);
 	  if (percent != last_percent) {
@@ -208,18 +193,66 @@ void compute_dx_dy(std::string config, std::string target, std::string pass){
     std::cout << "\rProcessing: 100% completed" << std::endl;
 
     // Draw Histograms
+    TCanvas* c1 = new TCanvas("c1", "Track Information", 1200, 400);
+    c1->Divide(3,1);
+    c1->cd(1); h_keprime_mag->Draw();
+    c1->cd(2); h_etheta->Draw();
+    c1->cd(3); h_ephi->Draw();
 
-    TCanvas* c1 = new TCanvas("c1", "dx vs dy", 900, 500);
-    c1->Divide(2,1);
-    c1->cd(1); h_dx_dy->Draw("COLZ");
-    c1->cd(2); h_dx_dy_cut->Draw("COLZ");
+    TCanvas* c2 = new TCanvas("c2", "track p vs etheta", 600, 500);
+    h_mag_etheta->Draw("COLZ");
 
-    TCanvas* c2 = new TCanvas("c2", "dx vs dy cut", 600, 500);
-    h_W2_dy->Draw("COLZ");
-
-    TCanvas* c3 = new TCanvas("c3", "dx", 900, 500);
+    TCanvas* c3 = new TCanvas("c3", "W2 and Q2", 1200, 500);
     c3->Divide(2,1);
-    c3->cd(1); h_dx->Draw();
-    c3->cd(2); h_dx_cut->Draw();
+    c3->cd(1);
+    h_W2_tr_cut->SetLineColor(kRed);
+    h_W2_tr_cut->SetLineStyle(2);
+    h_W2_tr_cut->SetLineWidth(2);
+    h_W2_tr_cut->SetStats(0);
+    h_W2_tr_cut->Draw();
+    h_W2_cut->SetLineColor(kGreen);
+    h_W2_cut->SetLineWidth(2);
+    h_W2_cut->SetStats(0);
+    h_W2_cut->Draw("SAME");
+    h_W2_tr->SetLineColor(kOrange);
+    h_W2_tr->SetLineStyle(2);
+    h_W2_tr->SetLineWidth(2);
+    h_W2_tr->SetStats(0);
+    h_W2_tr->Draw("SAME");
+    h_W2->SetLineColor(kBlue);
+    h_W2->SetLineWidth(2);
+    h_W2->SetStats(0);
+    h_W2->Draw("SAME");
+    TLegend *leg1 = new TLegend(0.6, 0.7, 0.9, 0.9);
+    leg1->AddEntry(h_W2, "h_W2", "l");
+    leg1->AddEntry(h_W2_cut, "h_W2_cut", "l");
+    leg1->AddEntry(h_W2_tr, "h_W2_tr", "l");
+    leg1->AddEntry(h_W2_tr_cut, "h_W2_tr_cut", "l");
+    leg1->Draw();
     
+    c3->cd(2);
+    h_Q2_tr->SetLineColor(kRed);
+    h_Q2_tr->SetLineStyle(2);
+    h_Q2_tr->SetLineWidth(2);
+    h_Q2_tr->SetStats(0);
+    h_Q2_tr->Draw();
+    h_Q2_tr_cut->SetLineColor(kOrange);
+    h_Q2_tr_cut->SetLineStyle(2);
+    h_Q2_tr_cut->SetLineWidth(2);
+    h_Q2_tr_cut->SetStats(0);
+    h_Q2_tr_cut->Draw("SAME");
+    h_Q2->SetLineColor(kBlue);
+    h_Q2->SetLineWidth(2);
+    h_Q2->SetStats(0);
+    h_Q2->Draw("SAME");
+    h_Q2_cut->SetLineColor(kGreen);
+    h_Q2_cut->SetLineWidth(2);
+    h_Q2_cut->SetStats(0);
+    h_Q2_cut->Draw("SAME");
+    TLegend *leg2 = new TLegend(0.6, 0.7, 0.9, 0.9);
+    leg2->AddEntry(h_Q2, "h_Q2", "l");
+    leg2->AddEntry(h_Q2_cut, "h_Q2_cut", "l");
+    leg2->AddEntry(h_Q2_tr, "h_Q2_tr", "l");
+    leg2->AddEntry(h_Q2_tr_cut, "h_Q2_tr_cut", "l");
+    leg2->Draw();
 }

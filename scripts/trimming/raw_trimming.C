@@ -175,7 +175,7 @@ void raw_trimming(std::string config, std::string target, std::string pass) {
                         for (const auto& [name, readerPtr] : arrayReaders) {
                             outArrays[name] = readerPtr->GetSize() > 0 ? (*readerPtr)[0] : -9999;
                         }
-                        outputTree->Fill();
+			outputTree->Fill();
                     }
 
                     inputFile->Close();

@@ -4,27 +4,25 @@
 //   Created by Jacob Koenemann & ChatGPT
 //   contact: bxy3zr@virginia.edu
 //                                                                     
-//   Last Modified April 6, 2025   
+//   Last Modified April 26, 2025   
 //
 //      
-//   The purpose of this script is to test out how         
-//   to compute dx and dy and how to structure the 
-//   a header file that I will use in the future.
+//   The purpose of this script is to compute dx     
+//   and dy and add these variables to the trimmed
+//   ROOT file from either data or simu.
 //                                                    
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////  
 #include "TFile.h"
 #include "TTree.h"
+#include "TBranch.h"
 #include "TVector3.h"
 #include "TLorentzVector.h"
 #include "TMath.h"
-#include "TH1D.h"
-#include "TH2D.h"
-#include "TCanvas.h"
 
 #include <iostream>
 
-void compute_dx_dy(std::string config, std::string target, std::string pass){
+void Computedxdy(std::string config, std::string target, std::string pass){
     // Validate config
     std::vector<std::string> valid_configs = {"kin2", "kin3", "kin4a", "kin4b"};
     if (std::find(valid_configs.begin(), valid_configs.end(), config) == valid_configs.end()) {
@@ -82,12 +80,12 @@ void compute_dx_dy(std::string config, std::string target, std::string pass){
     TVector3 HCAL_unitvector_y(TMath::Sin(TMath::Pi() - HCAL_angle), 0.0, TMath::Cos(TMath::Pi() - HCAL_angle));
     TVector3 HCAL_unitvector_x = HCAL_unitvector_y.Cross(HCAL_unitvector_z);
     
-    std::string dir_path = "../../../data/raw/" + pass + "/"  + config + "_" + target + "/";
+    std::string dir_path = "../../data/raw/" + pass + "/"  + config + "_" + target + "/";
     std::string file_name = "QE_data_" + exp_name + "_sbs100p_nucleon_np" + ".root";
     std::string file_path = dir_path + file_name;
 
     // Open ROOT file
-    TFile* file = TFile::Open(file_path.c_str());
+    TFile* file = new TFile(file_path.c_str(),"UPDATE");
     if (!file || file->IsZombie()) {
         std::cerr << "Error opening file!" << std::endl;
 	return;
@@ -113,9 +111,8 @@ void compute_dx_dy(std::string config, std::string target, std::string pass){
     tree->SetBranchAddress("bb.tr.px", &keprime_x);
     tree->SetBranchAddress("bb.tr.py", &keprime_y);
     tree->SetBranchAddress("bb.tr.pz", &keprime_z);
-    tree->SetBranchAddress("bb.ps.e", &eprime_she);
-    tree->SetBranchAddress("bb.sh.e", &eprime_pse);
-    tree->SetBranchAddress("bb.etot_over_p", &e_over_p);
+    //tree->SetBranchAddress("bb.ps.e", &eprime_she);
+    //tree->SetBranchAddress("bb.sh.e", &eprime_pse);
     tree->SetBranchAddress("bb.tr.vx", &target_x);
     tree->SetBranchAddress("bb.tr.vy", &target_y);
     tree->SetBranchAddress("bb.tr.vz", &target_z);
@@ -125,101 +122,73 @@ void compute_dx_dy(std::string config, std::string target, std::string pass){
 
     tree->SetBranchAddress("sbs.hcal.x", &Hcalx);
     tree->SetBranchAddress("sbs.hcal.y", &Hcaly);
-    tree->SetBranchAddress("sbs.hcal.e", &Hcale);
+    //tree->SetBranchAddress("sbs.hcal.e", &Hcale);
 
-    
-
-    // Pre-Defining Histograms for Calculations results
-    TH2D* h_dx_dy = new TH2D("h_dx_dy", "dx vs dy;dy;dx", 100, -11.0, 2.0, 100, -4.5, 2.0);
-    TH2D* h_W2_dy = new TH2D("h_W2_dy", "W2 vs dy;dy;W2", 100, -11.0, 2.0, 100, -2.0, 9.0);
-    TH2D* h_dx_dy_cut = new TH2D("h_dx_dy_cut", "dx vs dy", 100, -1.0, 1.0, 100, -4.5, 2.0);
-    TH1D* h_dx = new TH1D("h_dx", "dx", 100, -4.5, 2.0);
-    TH1D* h_dx_cut = new TH1D("h_dx_cut", "dx", 100, -4.5, 2.0);
+    // Setting sbs.hcal.x_exp, sbs.hcal.y_exp, dx, and dy Branch
+    double Hcalx_exp, Hcaly_exp, dx, dy;
+    TBranch* sbs_hcal_x_exp = tree->Branch("sbs.hcal.x_exp", &Hcalx_exp, "sbs.hcal.x_exp/D");
+    TBranch* sbs_hcal_y_exp = tree->Branch("sbs.hcal.y_exp", &Hcaly_exp, "sbs.hcal.y_exp/D");
+    TBranch* sbs_dx = tree->Branch("dx", &dx, "dx/D");
+    TBranch* sbs_dy = tree->Branch("dy", &dy, "dy/D");
 			     
     //Loop over entries of the tree
     Long64_t Nentries = tree->GetEntries();
     int last_percent = -1;
     for (Long64_t i = 0; i < Nentries; ++i) {
       tree->GetEntry(i);
-      if (TMath::Abs(target_z) <= 0.27 && TMath::Abs(target_x) <= 0.0115 && TMath::Abs(target_y) <= 0.0115 && Hcale > 0.025 && eprime_pse > 0.2 && ebeam_epics/1000 > 0) {
-	  // Defining momentum 3-vector
-	  TVector3 keprime_vec(keprime_x,keprime_y,keprime_z);
-	  TVector3 target_vec(target_x,target_y,target_z);
 
-	  double keprime_mag = keprime_vec.Mag();
-	  double etheta = keprime_vec.Theta();
-	  double ephi = keprime_vec.Phi();
-	  double eprime = keprime_vec.Mag();
-	  // double ebeam = ebeam_epics/1000;
+      // Defining momentum 3-vector
+      TVector3 keprime_vec(keprime_x,keprime_y,keprime_z);
+      TVector3 target_vec(target_x,target_y,target_z);
 
-	  TLorentzVector keprime(keprime_x,keprime_y,keprime_z,eprime);
-	  TLorentzVector ke(0.0,0.0,ebeam,ebeam);
-	  TLorentzVector P(0.0,0.0,0.0,MN);
-	  TLorentzVector q = ke - keprime;
-	  TLorentzVector Pprime = q + P;
+      double keprime_mag = keprime_vec.Mag();
+      double etheta = keprime_vec.Theta();
+      double ephi = keprime_vec.Phi();
+      double eprime = keprime_vec.Mag();
+      // double ebeam = ebeam_epics/1000;
 
-	  double eprime_el = ebeam / (1 + ebeam/MN * (1 - TMath::Cos(etheta)));
-	  TVector3 keprime_el_vec(eprime_el*TMath::Cos(ephi)*TMath::Sin(etheta),eprime_el*TMath::Sin(ephi)*TMath::Sin(etheta),eprime_el*TMath::Cos(etheta));
-	  TLorentzVector keprime_el(keprime_el_vec.X(),keprime_el_vec.Y(),keprime_el_vec.Z(),eprime_el);
+      TLorentzVector keprime(keprime_x,keprime_y,keprime_z,eprime);
+      TLorentzVector ke(0.0,0.0,ebeam,ebeam);
+      TLorentzVector P(0.0,0.0,0.0,MN);
+      TLorentzVector q = ke - keprime;
+      TLorentzVector Pprime = q + P;
 
-	  TLorentzVector Pprime_el = ke - keprime_el + P;
+      double eprime_el = ebeam / (1 + ebeam/MN * (1 - TMath::Cos(etheta)));
+      TVector3 keprime_el_vec(eprime_el*TMath::Cos(ephi)*TMath::Sin(etheta),eprime_el*TMath::Sin(ephi)*TMath::Sin(etheta),eprime_el*TMath::Cos(etheta));
+      TLorentzVector keprime_el(keprime_el_vec.X(),keprime_el_vec.Y(),keprime_el_vec.Z(),eprime_el);
 
-	  double nu;
-	  nu = q.E();
+      TLorentzVector Pprime_el = ke - keprime_el + P;
 
 
-	  TVector3 Pprime_vec = Pprime.Vect();
-	  TVector3 Pprime_unitvec = Pprime_vec.Unit();
+      TVector3 Pprime_vec = Pprime.Vect();
+      TVector3 Pprime_unitvec = Pprime_vec.Unit();
 
-          double w = (HCAL_vector - target_vec).Dot(HCAL_unitvector_z) / (Pprime_unitvec.Dot(HCAL_unitvector_z));
-	  TVector3 w_vec = target_vec + w*Pprime_unitvec;
-	  TVector3 D_vec = w_vec - HCAL_vector;
+      double w = (HCAL_vector - target_vec).Dot(HCAL_unitvector_z) / (Pprime_unitvec.Dot(HCAL_unitvector_z));
+      TVector3 w_vec = target_vec + w*Pprime_unitvec;
+      TVector3 D_vec = w_vec - HCAL_vector;
 
-	  double Hcaly_exp = D_vec.Dot(HCAL_unitvector_y);
-	  double Hcalx_exp = D_vec.Dot(HCAL_unitvector_x);
+      Hcaly_exp = D_vec.Dot(HCAL_unitvector_y);
+      Hcalx_exp = D_vec.Dot(HCAL_unitvector_x);
 
-	  double dx = Hcalx - Hcalx_exp;
-	  double dy = Hcaly - Hcaly_exp;
+      dx = Hcalx - Hcalx_exp;
+      dy = Hcaly - Hcaly_exp;
 
-	  
+      sbs_hcal_x_exp->Fill();
+      sbs_hcal_y_exp->Fill();
+      sbs_dx->Fill();
+      sbs_dy->Fill();
 
-	  double W2 = Pprime.Mag2();
-	  double Q2 = -q.Mag2();
-
-	  if (e_over_p >= 0.85 && e_over_p <= 1.15 && Q2 >= 2.0 && W2 < 2.0 && TMath::Abs(dy) < 0.5) {
-	    h_dx_dy_cut->Fill(dy,dx);
-	    h_dx_cut->Fill(dx);
-	  }
-
-	  h_dx_dy->Fill(dy,dx);
-	  h_dx->Fill(dx);
-	  h_W2_dy->Fill(dy,W2);
-      
-
-	  int percent = static_cast<int>(100.0 * i / Nentries);
-	  if (percent != last_percent) {
-	    std::cout << "\rProcessing: " << percent << "% completed" << std::flush;
-	    last_percent = percent;
-	  }
+      int percent = static_cast<int>(100.0 * i / Nentries);
+      if (percent != last_percent) {
+	 std::cout << "\rProcessing: " << percent << "% completed" << std::flush;
+	 last_percent = percent;
       }
 
       
     }
     std::cout << "\rProcessing: 100% completed" << std::endl;
+    tree->Write("",TObject::kOverwrite);
+    file->Close();
 
-    // Draw Histograms
-
-    TCanvas* c1 = new TCanvas("c1", "dx vs dy", 900, 500);
-    c1->Divide(2,1);
-    c1->cd(1); h_dx_dy->Draw("COLZ");
-    c1->cd(2); h_dx_dy_cut->Draw("COLZ");
-
-    TCanvas* c2 = new TCanvas("c2", "dx vs dy cut", 600, 500);
-    h_W2_dy->Draw("COLZ");
-
-    TCanvas* c3 = new TCanvas("c3", "dx", 900, 500);
-    c3->Divide(2,1);
-    c3->cd(1); h_dx->Draw();
-    c3->cd(2); h_dx_cut->Draw();
     
 }
