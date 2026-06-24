@@ -1,0 +1,7 @@
+venv/
+setup_py.csh
+sourceme_py.csh
+*.so
+*.dll
+*.dylib
+*~

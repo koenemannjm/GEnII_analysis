@@ -20,68 +20,56 @@
 #include "TLorentzVector.h"
 #include "TMath.h"
 
+// Need for reading .cfg file
 #include <iostream>
+#include <cstdlib>  // for std::exit and EXIT_FAILURE
+#include <fstream>
 
-void Computedxdy(std::string config, std::string target, std::string pass){
-    // Validate config
-    std::vector<std::string> valid_configs = {"kin2", "kin3", "kin4a", "kin4b"};
-    if (std::find(valid_configs.begin(), valid_configs.end(), config) == valid_configs.end()) {
-        std::cerr << "Error: Invalid configuration '" << config << "'.\n";
-        std::cerr << "Allowed configurations are: kin2, kin3, kin4a, kin4b.\n";
-        return;
+void Computedxdy(std::string config_file){
+
+    // Reading in config file
+    std::string config_path = "../../config/" + config_file;
+    std::ifstream cfg_file(config_path);
+    if (!cfg_file) {
+       std::cerr << "Error: Config file does not exist at " << config_path << std::endl;
+       std::exit(EXIT_FAILURE);
+    }
+    
+    std::ifstream cfg(config_path);
+    std::string line;
+    std::map<std::string, std::string> settings;
+
+    while (std::getline(cfg, line)) {
+        if (line.empty() || line[0] == '#') continue;
+	size_t eq_pos = line.find('=');
+        if (eq_pos == std::string::npos) continue;
+        std::string key = line.substr(0, eq_pos);
+        std::string value = line.substr(eq_pos + 1);
+        settings[key] = value;
     }
 
-    // Validate target
-    std::vector<std::string> valid_targets = {"He3", "H"};
-    if (std::find(valid_targets.begin(), valid_targets.end(), target) == valid_targets.end()) {
-        std::cerr << "Error: Invalid target '" << target << "'.\n";
-        std::cerr << "Allowed configurations are: He3, H.\n";
-        return;
-    }
+    // Pulling in Experiment naming
+    std::string config = settings["config"];
+    std::string exp_name = settings["exp_name"];
+    std::string pass = settings["pass"];
+    std::string target = settings["target"];
 
-    // Validate target
-    std::vector<std::string> valid_passes = {"pass1", "pass2"};
-    if (std::find(valid_passes.begin(), valid_passes.end(), pass) == valid_passes.end()) {
-        std::cerr << "Error: Invalid target '" << pass << "'.\n";
-        std::cerr << "Allowed configurations are: pass1, pass2.\n";
-        return;
-    }
-  
-    double ebeam;
+    // Pulling in Experiment kinematic parameters
+    double ebeam = std::stod(settings["ebeam"]);
+    double HCAL_angle_deg = std::stod(settings["hcal_angle"]);
+    double HCAL_angle = HCAL_angle_deg * TMath::DegToRad();
+    double HCAL_distance = std::stod(settings["hcal_distance"]);
+
+    // Some constant(s)
     double MN = 0.9385;
-    double HCAL_angle;
-    double HCAL_distance = 17.0;
-
-    // Set experiment name
-    std::string exp_name;
-    if (config == "kin2") {
-        exp_name = "GEN2";
-	ebeam = 4.291;
-	HCAL_angle = 34.7 * TMath::DegToRad();
-    }
-    else if (config == "kin3") {
-         exp_name = "GEN3";
-	 ebeam = 6.373;
-	 HCAL_angle = 21.6 * TMath::DegToRad();
-    }
-    else if (config == "kin4a") {
-         exp_name = "GEN4";
-	 ebeam = 8.448;
-	 HCAL_angle = 18.0 * TMath::DegToRad();
-    }
-    else if (config == "kin4b") {
-         exp_name = "GEN4b";
-	 ebeam = 8.448;
-	 HCAL_angle = 18.0 * TMath::DegToRad();
-    }
 
     TVector3 HCAL_vector(-HCAL_distance*TMath::Sin(HCAL_angle), 0.0, HCAL_distance*TMath::Cos(HCAL_angle));
     TVector3 HCAL_unitvector_z(TMath::Sin(HCAL_angle), 0.0, TMath::Cos(HCAL_angle));
     TVector3 HCAL_unitvector_y(TMath::Sin(TMath::Pi() - HCAL_angle), 0.0, TMath::Cos(TMath::Pi() - HCAL_angle));
     TVector3 HCAL_unitvector_x = HCAL_unitvector_y.Cross(HCAL_unitvector_z);
     
-    std::string dir_path = "../../data/raw/" + pass + "/"  + config + "_" + target + "/";
-    std::string file_name = "QE_data_" + exp_name + "_sbs100p_nucleon_np" + ".root";
+    std::string dir_path = "/lustre24/expphy/volatile/halla/sbs/koeneman/data/raw/" + pass +"/test/try7" + "/"  + config + "_" + target + "/";
+    std::string file_name = "QE_test_data_" + exp_name + "_sbs100p_nucleon_np" + ".root";
     std::string file_path = dir_path + file_name;
 
     // Open ROOT file
@@ -106,16 +94,22 @@ void Computedxdy(std::string config, std::string target, std::string pass){
     tree->SetBranchAddress("HALLA_p", &ebeam_epics);
     
     // BigBite variables
-    double keprime_x, keprime_y, keprime_z, eprime_she, eprime_pse, e_over_p, target_x, target_y, target_z;
+    std::vector<double>* px = nullptr;
+    std::vector<double>* py = nullptr;
+    std::vector<double>* pz = nullptr;
+    double eprime_she, eprime_pse, e_over_p;
+    std::vector<double>* tx = nullptr;
+    std::vector<double>* ty = nullptr;
+    std::vector<double>* tz = nullptr;
 
-    tree->SetBranchAddress("bb.tr.px", &keprime_x);
-    tree->SetBranchAddress("bb.tr.py", &keprime_y);
-    tree->SetBranchAddress("bb.tr.pz", &keprime_z);
+    tree->SetBranchAddress("bb.tr.px", &px);
+    tree->SetBranchAddress("bb.tr.py", &py);
+    tree->SetBranchAddress("bb.tr.pz", &pz);
     //tree->SetBranchAddress("bb.ps.e", &eprime_she);
     //tree->SetBranchAddress("bb.sh.e", &eprime_pse);
-    tree->SetBranchAddress("bb.tr.vx", &target_x);
-    tree->SetBranchAddress("bb.tr.vy", &target_y);
-    tree->SetBranchAddress("bb.tr.vz", &target_z);
+    tree->SetBranchAddress("bb.tr.vx", &tx);
+    tree->SetBranchAddress("bb.tr.vy", &ty);
+    tree->SetBranchAddress("bb.tr.vz", &tz);
 
     // Hcal variables
     double Hcalx, Hcaly, Hcale;
@@ -130,12 +124,23 @@ void Computedxdy(std::string config, std::string target, std::string pass){
     TBranch* sbs_hcal_y_exp = tree->Branch("sbs.hcal.y_exp", &Hcaly_exp, "sbs.hcal.y_exp/D");
     TBranch* sbs_dx = tree->Branch("dx", &dx, "dx/D");
     TBranch* sbs_dy = tree->Branch("dy", &dy, "dy/D");
+
+    double keprime_x, keprime_y, keprime_z, target_x, target_y, target_z;
 			     
     //Loop over entries of the tree
     Long64_t Nentries = tree->GetEntries();
     int last_percent = -1;
     for (Long64_t i = 0; i < Nentries; ++i) {
       tree->GetEntry(i);
+
+      if (px->size() > 0 && py->size() > 0 && pz->size() > 0) {
+	  keprime_x = px->at(0);
+	  keprime_y = py->at(0);
+	  keprime_z = pz->at(0);
+	  target_x = tx->at(0);
+	  target_y = ty->at(0);
+	  target_z = tz->at(0);
+      }
 
       // Defining momentum 3-vector
       TVector3 keprime_vec(keprime_x,keprime_y,keprime_z);

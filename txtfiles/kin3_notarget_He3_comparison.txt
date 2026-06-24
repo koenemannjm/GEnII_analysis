@@ -1,0 +1,51 @@
+
+Some universal information for both analysis
+
+cointime := sbs.hcal.clus_blk.tdctime[0]-bb.hodotdc.clus.bar.tdc.meantime[0]
+     tree->SetAlias("cointime","sbs.hcal.clus_blk.tdctime[0]-bb.hodotdc.clus.bar.tdc.meantime[0]")
+QE cuts = "e.kine.W2<2.0&&e.kine.W2>0&&bb.ps.e>0.2&&sbs.hcal.e>0.025&&(bb.ps.e+bb.sh.e)/bb.tr.p[0]>0.65&&abs(dy)<1.0"
+
+The goal of this is to compute some effective cross section for the He3 atom and N2 
+
+notarget information:
+
+      files = {e1209016_fullreplay_2873_stream0_2_seg0_0.root, e1209016_fullreplay_2873_stream0_2_seg1_1.root, e1209016_fullreplay_2873_stream0_2_seg2_2.root, e1209016_fullreplay_2873_stream0_2_seg3_3.root ,e1209016_fullreplay_2873_stream0_2_seg4_4.root, e1209016_fullreplay_2873_stream0_2_seg5_5.root, e1209016_fullreplay_2873_stream0_2_seg6_6.root}
+
+     These files come from pass2 try7 replays.
+     directory = /lustre24/expphy/volatile/halla/sbs/sbs-gen/GEN_REPLAYS/pass2/TEST/try7/GEN3/notarget/rootfiles
+
+     total events = 135771
+
+     Additional QE cuts = "&&abs(cointime -1)<15"
+          The cut for cointime is "cointime - 1 < 15" because the peak of the coincidence is around 1.0ns and I'm becing conservative about the cointime width.
+
+     total QE events = 381
+     
+     beam energy = 6.3729 ±  0.000014 GeV
+
+     beam current = 29.25 ± 0.009 uA
+
+     event time = 235e9 (units are unclear from g.evtime ~ maybe nanoseconds?)
+
+He3 information:
+
+    run number = 2692
+    
+    files = {e1209016_fullreplay_2692_stream0_2_seg0_0.root, e1209016_fullreplay_2692_stream0_2_seg10_10.root, e1209016_fullreplay_2692_stream0_2_seg11_11.root, e1209016_fullreplay_2692_stream0_2_seg1_1.root, e1209016_fullreplay_2692_stream0_2_seg12_12.root, e1209016_fullreplay_2692_stream0_2_seg13_13.root, e1209016_fullreplay_2692_stream0_2_seg14_14.root, e1209016_fullreplay_2692_stream0_2_seg15_15.root, e1209016_fullreplay_2692_stream0_2_seg16_16.root, e1209016_fullreplay_2692_stream0_2_seg17_17.root, e1209016_fullreplay_2692_stream0_2_seg18_18.root, e1209016_fullreplay_2692_stream0_2_seg19_19.root, e1209016_fullreplay_2692_stream0_2_seg20_20.root, e1209016_fullreplay_2692_stream0_2_seg21_21.root, e1209016_fullreplay_2692_stream0_2_seg22_22.root, e1209016_fullreplay_2692_stream0_2_seg2_2.root, e1209016_fullreplay_2692_stream0_2_seg23_23.root, e1209016_fullreplay_2692_stream0_2_seg24_24.root, e1209016_fullreplay_2692_stream0_2_seg25_25.root, e1209016_fullreplay_2692_stream0_2_seg26_26.root, e1209016_fullreplay_2692_stream0_2_seg27_27.root, e1209016_fullreplay_2692_stream0_2_seg3_3.root, e1209016_fullreplay_2692_stream0_2_seg4_4.root, e1209016_fullreplay_2692_stream0_2_seg5_5.root, e1209016_fullreplay_2692_stream0_2_seg6_6.root, e1209016_fullreplay_2692_stream0_2_seg7_7.root, e1209016_fullreplay_2692_stream0_2_seg8_8.root, e1209016_fullreplay_2692_stream0_2_seg9_9.root}
+    
+    These files also come from pass2 try7 replays but for the He3 data.
+    directory = /lustre24/expphy/volatile/halla/sbs/sbs-gen/GEN_REPLAYS/pass2/TEST/try7/GEN3/rootfiles
+    
+    total events = 730874 
+    
+    Additional QE cuts = "&&abs(cointime - 1)<15&&abs(bb.tr.vz[0])<0.27"
+         The cut for the cointime is again based around the central value of the cointime peak being at 1.0ns.
+    
+    total QE events = 2232
+    
+    beam energy = 6.37304 ± 3.45e-06  GeV
+    
+    beam current = 18.10 ± 3.22e-03  uA
+    
+    event time = 905e9 (units are unclear from g.evtime ~ maybe nanoseconds?)
+    
