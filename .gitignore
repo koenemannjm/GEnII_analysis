@@ -4,6 +4,8 @@ sourceme_py.csh
 *.so
 *.dll
 *.dylib
+*.d
+*.pcm
 *~
 *.pdf
 *.root

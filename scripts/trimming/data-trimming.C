@@ -12,6 +12,7 @@
 #include <TRegexp.h>
 #include <TMath.h>
 #include "TChainElement.h"
+#include "TTreeFormula.h"
 
 #include <string>
 #include <vector>
@@ -119,10 +120,10 @@ void data_trimming(const std::string& config_filename){
   std::cout << "Getting number of events to analyze..." << std::endl;
   Long64_t totEntries = C.GetEntries();
   std::cout << "Total Events: " << totEntries << std::endl;
-  
+
+  std::cout << std::endl;
   int currentTree = -1;
   Long64_t finalEntries = 0;
-  
   for (Long64_t event = 0; event < totEntries; event++) {
 
     Long64_t entryLoading = C.GetEntry(event);
@@ -135,8 +136,8 @@ void data_trimming(const std::string& config_filename){
 
     if (event % 50000 == 0) {
       double percent = event * 100.0 / totEntries;
-      std::cout << "event : " << event << "| " << std::fixed << std::setprecision(3)
-		<< percent << "%"<< std::endl;
+      std::cout << "\rProgress: " << std::fixed << std::setprecision(3)
+		<< percent << "%"<< std::flush;
     }
 
     if (globalCut_expression.EvalInstance() == 0) continue;
@@ -163,6 +164,8 @@ void data_trimming(const std::string& config_filename){
     finalEntries++;
     
   }
+
+  std::cout << std::endl;
 
   output_rootTree->Write();
   output_rootFile.Close();
