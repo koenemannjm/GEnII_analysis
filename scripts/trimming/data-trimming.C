@@ -90,7 +90,6 @@ void data_trimming(const std::string& config_filename){
   
   TFile output_rootFile(output_rootDir+output_rootFileName, "recreate");
   TTree *output_rootTree = C.CloneTree(0);
-  output_rootTree->SetAutoFlush(0);
 
   double sbs_hcal_dx, sbs_hcal_dy, sbs_hcal_x_exp, sbs_hcal_y_exp;
 
@@ -126,13 +125,16 @@ void data_trimming(const std::string& config_filename){
   Long64_t finalEntries = 0;
   for (Long64_t event = 0; event < totEntries; event++) {
 
-    Long64_t entryLoading = C.GetEntry(event);
-    if (entryLoading <= 0) break;
+    Long64_t local_entry = C.LoadTree(event);
+    if (local_entry < 0) break;
 
     if (C.GetTreeNumber() != currentTree) {
       currentTree = C.GetTreeNumber();
       globalCut_expression.UpdateFormulaLeaves();
     }
+
+    Long64_t entryLoading = C.GetEntry(event);
+    if (entryLoading <= 0) break;
 
     if (event % 50000 == 0) {
       double percent = event * 100.0 / totEntries;
