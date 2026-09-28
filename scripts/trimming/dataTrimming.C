@@ -1,17 +1,10 @@
 #include "../../include/configParser.C"
 #include "../../include/computeKineVariables.C"
 
-#include <ROOT/RDataFrame.hxx>
 #include "TChain.h"
 #include "TFile.h"
 #include "TTree.h"
-#include <TObjArray.h>
-#include <TBranch.h>
-#include <TSystem.h>
-#include <TString.h>
-#include <TRegexp.h>
-#include <TMath.h>
-#include "TChainElement.h"
+#include "TMath.h"
 #include "TTreeFormula.h"
 
 #include <string>
@@ -19,7 +12,7 @@
 #include <iostream>
 #include <iomanip>
 
-void data_trimming(const std::string& config_filename){
+void dataTrimming(const std::string& config_filename){
   
   readConfig(config_filename);
 
@@ -49,6 +42,7 @@ void data_trimming(const std::string& config_filename){
   C.SetBranchStatus("bb.sh.idblk",1);
   C.SetBranchStatus("bb.sh.nblk",1);
   C.SetBranchStatus("bb.sh.clus_blk.*");
+  C.SetBranchStatus("Ndata.bb.sh.clus_blk.*");
   
   C.SetBranchStatus("bb.ps.e",1);
   C.SetBranchStatus("bb.ps.atimeblk",1);
@@ -60,6 +54,7 @@ void data_trimming(const std::string& config_filename){
   C.SetBranchStatus("bb.ps.idblk",1);
   C.SetBranchStatus("bb.ps.nblk",1);
   C.SetBranchStatus("bb.ps.clus_blk.*");
+  C.SetBranchStatus("Ndata.bb.ps.clus_blk.*");
   
   C.SetBranchStatus("sbs.hcal.e",1);
   C.SetBranchStatus("sbs.hcal.atimeblk",1);
@@ -73,10 +68,26 @@ void data_trimming(const std::string& config_filename){
   C.SetBranchStatus("sbs.hcal.clus_blk.*");
   C.SetBranchStatus("sbs.hcal.clus.*");
   C.SetBranchStatus("sbs.hcal.goodblock.*",1);
+  C.SetBranchStatus("Ndata.sbs.hcal.clus_blk.*");
+  C.SetBranchStatus("Ndata.sbs.hcal.clus.*");
+  C.SetBranchStatus("Ndata.sbs.hcal.goodblock.*",1);
   
   C.SetBranchStatus("bb.tr.v*",1);
   C.SetBranchStatus("bb.tr.p*",1);
+  C.SetBranchStatus("bb.tr.th",1);
+  C.SetBranchStatus("bb.tr.x",1);
+  C.SetBranchStatus("bb.tr.y",1);
+  C.SetBranchStatus("bb.tr.chi2",1);
+  C.SetBranchStatus("bb.tr.ndof",1);
   C.SetBranchStatus("bb.etot_over_p",1);
+  C.SetBranchStatus("Ndata.bb.tr.v*",1);
+  C.SetBranchStatus("Ndata.bb.tr.p*",1);
+  C.SetBranchStatus("Ndata.bb.tr.th",1);
+  C.SetBranchStatus("Ndata.bb.tr.x",1);
+  C.SetBranchStatus("Ndata.bb.tr.y",1);
+  C.SetBranchStatus("Ndata.bb.tr.chi2",1);
+  C.SetBranchStatus("Ndata.bb.tr.ndof",1);
+  C.SetBranchStatus("Ndata.bb.etot_over_p",1);
   
   C.SetBranchStatus("bb.hodotdc.clus.bar.tdc.*",1);
   C.SetBranchStatus("bb.hodotdc.clus.tfinal",1);
@@ -85,6 +96,13 @@ void data_trimming(const std::string& config_filename){
   C.SetBranchStatus("bb.hodotdc.clus.xmean",1);
   C.SetBranchStatus("bb.hodotdc.clus.ymean",1);
   C.SetBranchStatus("bb.hodotdc.clus.id",1);
+  C.SetBranchStatus("Ndata.bb.hodotdc.clus.bar.tdc.*",1);
+  C.SetBranchStatus("Ndata.bb.hodotdc.clus.tfinal",1);
+  C.SetBranchStatus("Ndata.bb.hodotdc.clus.tmean",1);
+  C.SetBranchStatus("Ndata.bb.hodotdc.clus.tmeanRFcorr",1);
+  C.SetBranchStatus("Ndata.bb.hodotdc.clus.xmean",1);
+  C.SetBranchStatus("Ndata.bb.hodotdc.clus.ymean",1);
+  C.SetBranchStatus("Ndata.bb.hodotdc.clus.id",1);
 
   C.SetBranchStatus("e.kine.*",1);
   
@@ -102,7 +120,9 @@ void data_trimming(const std::string& config_filename){
   C.SetBranchAddress("sbs.hcal.x", &sbs_hcal_x);
   C.SetBranchAddress("sbs.hcal.y", &sbs_hcal_y);
 
-  double bb_tr_px[100], bb_tr_py[100], bb_tr_pz[100], bb_tr_p[100], bb_tr_vx[100], bb_tr_vy[100], bb_tr_vz[100];
+  double bb_tr_px[100], bb_tr_py[100], bb_tr_pz[100];
+  double bb_tr_p[100];
+  double bb_tr_vx[100], bb_tr_vy[100], bb_tr_vz[100];
   C.SetBranchAddress("bb.tr.px", bb_tr_px);
   C.SetBranchAddress("bb.tr.py", bb_tr_py);
   C.SetBranchAddress("bb.tr.pz", bb_tr_pz);
@@ -123,6 +143,10 @@ void data_trimming(const std::string& config_filename){
   std::cout << std::endl;
   int currentTree = -1;
   Long64_t finalEntries = 0;
+
+  std::vector<double> dxdy;
+  TVector3 kf;
+  TVector3 v;
   for (Long64_t event = 0; event < totEntries; event++) {
 
     Long64_t local_entry = C.LoadTree(event);
@@ -144,17 +168,17 @@ void data_trimming(const std::string& config_filename){
 
     if (globalCut_expression.EvalInstance() == 0) continue;
 
-    TVector3 kf(bb_tr_px[0], bb_tr_py[0], bb_tr_pz[0]);
-    TVector3 v(bb_tr_vx[0], bb_tr_vy[0], bb_tr_vz[0]);
+    kf.SetXYZ(bb_tr_px[0], bb_tr_py[0], bb_tr_pz[0]);
+    v.SetXYZ(bb_tr_vx[0], bb_tr_vy[0], bb_tr_vz[0]);
 
-    std::vector<double> dxdy = computeDxDy(target,
-					   beam_energy,
-					   hcal_angle,
-					   hcal_distance,
-					   kf,
-					   v,
-					   sbs_hcal_x,
-					   sbs_hcal_y);
+    dxdy = computeDxDy(target,
+		       beam_energy,
+		       hcal_angle,
+		       hcal_distance,
+		       kf,
+		       v,
+		       sbs_hcal_x,
+		       sbs_hcal_y);
 
     sbs_hcal_dx = dxdy[0];
     sbs_hcal_dy = dxdy[1];
@@ -174,5 +198,8 @@ void data_trimming(const std::string& config_filename){
 
   std::cout << "Trimmed rootfile created!" << std::endl;
   std::cout << "Events Passed: " << finalEntries << "/" << totEntries << " events" << std::endl;
+  
+  clearConfig();
+  delete output_rootTree;
   
 }

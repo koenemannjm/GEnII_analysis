@@ -16,9 +16,8 @@ void studyHCALClustering(const std::string& config_filename) {
   TString configKine = getConfigString("config");
   TString passKine = getConfigString("pass");
   TString sbsConfigKine = getConfigString("sbs_config");
-  TString rootFile = getConfigString("output_filename");
+  TString rootFile = getConfigString("QE_output_filename");
   TString rootDir = getConfigString("output_dir");
-  TString goodeCut = getConfigString("goode_cut");
   double hcal_angle = getConfigDouble("hcal_angle");
   double hcal_distance = getConfigDouble("hcal_distance");
   double de_offset = getConfigDouble("de_offset");
@@ -28,13 +27,10 @@ void studyHCALClustering(const std::string& config_filename) {
   TString rootPath = rootDir + rootFileAll;
 
   std::cout << "ROOT file: " << rootFile << std::endl;
-  std::cout << "goodeCut: " << goodeCut << std::endl;
 
   TChain C("T");
 
   C.Add(rootPath);
-
-  TTreeFormula cutFormula("cutFormula", goodeCut.Data(), &C);
 
   TH2D *h2d_gb_cluster_0 = new TH2D("h2d_gb_cluster_0", "Primary Cluster GoodBlock; HCAL Y; HCAL X",14,-1.00711,1.00711,26,-2.734375,1.234375);
   TH2D *h2d_gb_cluster_1 = (TH2D*) h2d_gb_cluster_0->Clone("h2d_gb_cluster_1");
@@ -58,6 +54,7 @@ void studyHCALClustering(const std::string& config_filename) {
 
   TH2D *h2d_clust_survive_si = new TH2D("h2d_clust_survive_si","; Cluster id; S",10,-0.5,9.5,300,-0.1,1.1);
   TH2D *h2d_gb_dt_e = new TH2D("h2d_gb_dt_e", "Good Block Cointime vs Block Energy; E_{HCAL,gb}; t_{HCAL,gb} - t_{BBSH}",300,0,2.0,300,-15,15);
+  TH2D *h2d_dt_e = (TH2D*) h2d_gb_dt_e->Clone("h2d_dt_e");
   TH2D *h2d_gb_dxdy = new TH2D("h2d_gb_dxdy", "Good Block position weighted=e^2 (weight>1); dy; dx",300,-2.,2.,300,-3.,1.5);
   TH1D *h1d_gb_dx = h2d_gb_dxdy->ProjectionY("h1d_gb_dx");
   TH1D *h1d_gb_dy = h2d_gb_dxdy->ProjectionX("h1d_gb_dy");
@@ -70,7 +67,11 @@ void studyHCALClustering(const std::string& config_filename) {
   TGraph *gr = new TGraph();
   TGraph *gr2 = new TGraph();
   
-  TString outpdf_file = configKine + "_" + target + "_" + passKine + "_" + sbsConfigKine + "_" + "studyHCALClustering" + ".pdf";
+  TString outpdf_file = "studyHCALClustering" + "_" + configKine + "_" + target + "_" + passKine + "_" + sbsConfigKine + ".pdf";
+  TString outroot_file = "studyHCALClustering" + "_" + configKine + "_" + target + "_" + passKine + "_" + sbsConfigKine + ".root";
+
+  //TFile fOut(outroot_file.Data());
+  
   TCanvas *c3 = new TCanvas("c3", "c3", 1200, 800);
   c3->Divide(3,1);
   TCanvas *c2 = new TCanvas("c2", "c2", 1200, 800);
@@ -78,12 +79,13 @@ void studyHCALClustering(const std::string& config_filename) {
 
   double sbs_hcal_goodblock_atime[300], sbs_hcal_goodblock_e[300], sbs_hcal_goodblock_col[300], sbs_hcal_goodblock_row[300], sbs_hcal_goodblock_cid[300];
   double sbs_hcal_goodblock_x[300], sbs_hcal_goodblock_y[300], sbs_hcal_goodblock_id[300];
-  double bb_sh_atimeblk, sbs_hcal_nclus;
-  double sbs_hcal_x, sbs_hcal_y, sbs_hcal_e;
+  double bb_sh_atimeblk, sbs_hcal_nclus, sbs_hcal_nblk;
+  double sbs_hcal_x, sbs_hcal_y, sbs_hcal_e, sbs_hcal_atimeblk;
   double sbs_hcal_x_exp, sbs_hcal_y_exp;
   double sbs_hcal_dx, sbs_hcal_dy;
   double e_kine_W2, e_kine_Q2;
   int Ndata_sbs_hcal_goodblock_atime;
+  double sbs_hcal_clus_adctime[100];
   
   C.SetBranchAddress("sbs.hcal.goodblock.atime", sbs_hcal_goodblock_atime);
   C.SetBranchAddress("sbs.hcal.goodblock.e", sbs_hcal_goodblock_e);
@@ -105,6 +107,9 @@ void studyHCALClustering(const std::string& config_filename) {
   C.SetBranchAddress("sbs.hcal.dy", &sbs_hcal_dy);
   C.SetBranchAddress("e.kine.W2", &e_kine_W2);
   C.SetBranchAddress("e.kine.Q2", &e_kine_Q2);
+  C.SetBranchAddress("sbs.hcal.nblk", &sbs_hcal_nblk);
+  C.SetBranchAddress("sbs.hcal.atimeblk", &sbs_hcal_atimeblk);
+  C.SetBranchAddress("sbs.hcal.clus.adctime", sbs_hcal_clus_adctime);
 
   double coin_time_resolution = 0.77;
   double confidence_coin_time = 3.0;
@@ -115,30 +120,17 @@ void studyHCALClustering(const std::string& config_filename) {
   double hcal_e_resolution = 0.6;
   double confidence_hcal_e = 3.0;
   double de_conf = hcal_e_resolution*confidence_hcal_e;
-  double si_threshold = 0.55;
-
-  double confidence_weight = (dt_conf)*(dr_conf);
-
-  double weight_dt_min = 0.5*dt_conf/(dt_conf*dt_conf + 0.25*dt_conf*dt_conf)/3.14159265359;
-  double weight_dr_min = 0.5*dr_conf/(dr_conf*dr_conf + 0.25*dr_conf*dr_conf)/3.14159265359;
-
-  //double weight_min = weight_dt_min*weight_dr_min;
+  
   double weight_min = 1.0;
 
   Long64_t max_event = C.GetEntries();
   int goodblock_tracker = 0;
   int max_goodblock_tracker = 100;
-  int currentTree = -1;
   
   for (Long64_t event=0; event<max_event; event++) {
 
     Long64_t local_entry = C.LoadTree(event);
     if (local_entry < 0) break;
-    
-    if (C.GetTreeNumber() != currentTree) {
-      currentTree = C.GetTreeNumber();
-      cutFormula.UpdateFormulaLeaves();
-    }
 
     Long64_t entryLoading = C.GetEntry(event);
     if (entryLoading <=0) break;
@@ -147,8 +139,6 @@ void studyHCALClustering(const std::string& config_filename) {
       std::cout << "\rProgress: " << event << std::flush;
     }
     
-    if (cutFormula.EvalInstance() == 0) continue;
-
     int number_hcal_goodblocks = Ndata_sbs_hcal_goodblock_atime;
     if (number_hcal_goodblocks < 3) continue;
 
@@ -236,7 +226,7 @@ void studyHCALClustering(const std::string& config_filename) {
     double si;
     double si_total = 0.0;
     double si_max = -1.0;
-    int id_max;
+    int id_max, cid_max;
     double xgb_max = 0.0;
     double ygb_max = 0.0;
     double tgb_max = 0.0;
@@ -261,16 +251,7 @@ void studyHCALClustering(const std::string& config_filename) {
       
       weight_dt = pow(dt_conf/dti,2);
       weight_dr = pow(dr_conf/dri,2);
-      //weight_dr = 1.0;
-      //weight_de = 1.0;
       weight_de = pow(de_conf/dei,2);
-
-      //weight_dt = exp(-0.5*pow(dti/dt_conf,2))/sqrt(2.0*3.14159265359)/dt_conf;
-      //weight_de = exp(-0.5*pow(dei/de_conf,2))/sqrt(2.0*3.14159265359)/de_conf;
-      //weight_dr = exp(-0.5*pow(dri/dr_conf,2))/sqrt(2.0*3.14159265359)/dr_conf;
-      
-      //weight_dt = 0.5*dt_conf/(dti*dti + 0.25*dt_conf*dt_conf)/3.14159265359;
-      //weight_dr = 0.5*dr_conf/(dri*dri + 0.25*dr_conf*dr_conf)/3.14159265359;
       
       weight = weight_dt*weight_dr*weight_de;
 
@@ -283,7 +264,12 @@ void studyHCALClustering(const std::string& config_filename) {
 	xgb_max = hcal_gb_xi;
 	ygb_max = hcal_gb_yi;
 	tgb_max = hcal_gb_adctimei;
+	cid_max = hcal_gb_cidi;
       }
+    }
+
+    if (abs(tgb_max - bb_sh_atimeblk)<5) {
+      h2d_clust_survive_si->Fill(cid_max,si_max/si_total);
     }
     
     double sum_e = 0.0;
@@ -314,17 +300,8 @@ void studyHCALClustering(const std::string& config_filename) {
       
       weight_dt = pow(dt_conf/dti,2);
       weight_dr = pow(dr_conf/dri,2);
-      //weight_dr = 1.0;
-      //weight_de = 1.0;
       weight_de = pow(de_conf/dei,2);
 
-      //weight_dt = exp(-0.5*pow(dti/dt_conf,2))/sqrt(2.0*3.14159265359)/dt_conf;
-      //weight_de = exp(-0.5*pow(dei/de_conf,2))/sqrt(2.0*3.14159265359)/de_conf;
-      //weight_dr = exp(-0.5*pow(dri/dr_conf,2))/sqrt(2.0*3.14159265359)/dr_conf;
-      
-      //weight_dt = 0.5*dt_conf/(dti*dti + 0.25*dt_conf*dt_conf)/3.14159265359;
-      //weight_dr = 0.5*dr_conf/(dri*dri + 0.25*dr_conf*dr_conf)/3.14159265359;
-      
       weight = weight_dt*weight_dr*weight_de;
 
       si = hcal_gb_ei*weight;
@@ -336,16 +313,14 @@ void studyHCALClustering(const std::string& config_filename) {
       gbdxi = xgb_max-hcal_gb_xi;
       gbdyi = ygb_max-hcal_gb_yi;
 
-      if ((abs(gbdti)<5.5)&&(sqrt(gbdxi*gbdxi + gbdyi*gbdyi)<0.6)) {
+      if ((abs(gbdti)<5)&&(sqrt(gbdxi*gbdxi + gbdyi*gbdyi)<0.3)) {
 	sum_blocks += 1;
 	sum_e += hcal_gb_ei;
 	sum_t += hcal_gb_adctimei*pow(hcal_gb_ei,2);;
 	sum_weight_posx += hcal_gb_xi*pow(hcal_gb_ei,2);
 	sum_weight_posy += hcal_gb_yi*pow(hcal_gb_ei,2);
 	sum_weight += pow(hcal_gb_ei,2);
-	if (int(sbs_hcal_goodblock_id[i])==id_max) {
-	  h2d_clust_survive_si->Fill(hcal_gb_cidi,si);
-	}
+	
       }
 
       if (int(sbs_hcal_goodblock_id[i])!=id_max) {
@@ -365,21 +340,21 @@ void studyHCALClustering(const std::string& config_filename) {
 	else if (int(hcal_gb_cidi) == 1) {
 	  h2d_gb_cluster_1->Fill(hcal_gb_yi,hcal_gb_xi,hcal_gb_ei);
 	  h2d_gb_cluster_1_tweight->Fill(hcal_gb_yi,hcal_gb_xi,si);
-	  if (tdiff<5.0) {
+	  if (tdiff<5) {
 	    h2d_gb_cluster_1_tcut->Fill(hcal_gb_yi,hcal_gb_xi,hcal_gb_ei);
 	  }
 	}
 	else if (int(hcal_gb_cidi) == 2) {
 	  h2d_gb_cluster_2->Fill(hcal_gb_yi,hcal_gb_xi,hcal_gb_ei);
 	  h2d_gb_cluster_2_tweight->Fill(hcal_gb_yi,hcal_gb_xi,si);
-	  if (tdiff<5.0) {
+	  if (tdiff<5) {
 	    h2d_gb_cluster_2_tcut->Fill(hcal_gb_yi,hcal_gb_xi,hcal_gb_ei);
 	  }
 	}
 	else {
 	  h2d_gb_cluster_3->Fill(hcal_gb_yi,hcal_gb_xi,hcal_gb_ei);
 	  h2d_gb_cluster_3_tweight->Fill(hcal_gb_yi,hcal_gb_xi,si);
-	  if (tdiff<5.0) {
+	  if (tdiff<5) {
 	    h2d_gb_cluster_3_tcut->Fill(hcal_gb_yi,hcal_gb_xi,hcal_gb_ei);
 	  }
 	}
@@ -391,33 +366,40 @@ void studyHCALClustering(const std::string& config_filename) {
       }
     }
 
+    sum_weight_posx /= sum_weight;
+    sum_weight_posy /= sum_weight;
+    sum_t /= sum_weight;
+
     if (sum_blocks>1) {
-      sum_weight_posx /= sum_weight;
-      sum_weight_posy /= sum_weight;
-      sum_t /= sum_weight;
+      
       h2d_gb_dt_e->Fill(sum_e,sum_t - bb_sh_atimeblk);
-      if ((abs(sum_t - bb_sh_atimeblk)<2.0)&&(sum_e>0.02)) {
+
+      if (abs(sum_t - bb_sh_atimeblk)<2.0) {
 	h2d_gb_dxdy->Fill(sum_weight_posy-sbs_hcal_y_exp,sum_weight_posx-sbs_hcal_x_exp);
-	h2d_dxdy->Fill(sbs_hcal_dy,sbs_hcal_dx);
 	h1d_gb_dy->Fill(sum_weight_posy-sbs_hcal_y_exp);
-	h1d_dy->Fill(sbs_hcal_dy);
-	if (abs(sum_weight_posy-sbs_hcal_y_exp)<0.2) {
+	if (abs(sum_weight_posy-sbs_hcal_y_exp)<0.5) {
 	  h1d_gb_dx->Fill(sum_weight_posx-sbs_hcal_x_exp);
-	  if (abs(sum_weight_posx-sbs_hcal_x_exp)<0.3) {
+	  if (abs(sum_weight_posx-sbs_hcal_x_exp)<0.5) {
 	    h1d_W2->Fill(e_kine_W2);
-	  }
-	}
-	if (abs(sbs_hcal_dy)<0.2) {
-	  h1d_dx->Fill(sbs_hcal_dx);
-	  if (abs(sbs_hcal_dx)<0.3) {
-	    h1d_W2_1->Fill(e_kine_W2);
 	  }
 	}
       }
     }
-    else {
-      sum_weight_posx = 0.0;
-      sum_weight_posy = 0.0;
+    
+    if (sbs_hcal_nblk>1) {
+      
+      h2d_dt_e->Fill(sbs_hcal_e,sbs_hcal_clus_adctime[0] - bb_sh_atimeblk);
+      
+      if (abs(sbs_hcal_clus_adctime[0] - bb_sh_atimeblk)<2.0) {
+	h2d_dxdy->Fill(sbs_hcal_dy,sbs_hcal_dx);
+	h1d_dy->Fill(sbs_hcal_dy);
+	if (abs(sbs_hcal_dy)<0.5) {
+	  h1d_dx->Fill(sbs_hcal_dx);
+	  if (abs(sbs_hcal_dx)<0.5) {
+	    h1d_W2_1->Fill(e_kine_W2);
+	  }
+	}
+      }
     }
 
     if (bool_event_display) {
@@ -508,6 +490,25 @@ void studyHCALClustering(const std::string& config_filename) {
   c->Print(outpdf_file.Data());
 
   c->cd();
+  h2d_dt_e->Draw("colz");
+  c->Print(outpdf_file.Data());
+
+  TH1D *h1d_e = h2d_dt_e->ProjectionX("h1d_e");
+  TH1D *h1d_t = h2d_dt_e->ProjectionY("h1d_t");
+
+  c->Clear();
+
+  c->Divide(2,1);
+  c->cd(1);
+  h1d_e->Draw();
+  c->Update();
+  
+  c->cd(2);
+  h1d_t->Draw();
+  c->Update();
+  c->Print(outpdf_file.Data());
+
+  c->cd();
   h2d_clust_survive_si->Draw("colz");
   c->Print(outpdf_file.Data());
 
@@ -574,6 +575,8 @@ void studyHCALClustering(const std::string& config_filename) {
 
   c->Print((outpdf_file + ")").Data());
 
+  clearConfig();
+
   delete c;
   delete c2;
   delete c3;
@@ -594,6 +597,9 @@ void studyHCALClustering(const std::string& config_filename) {
   delete h2d_gb_dt_e;
   delete h1d_gb_e;
   delete h1d_gb_t;
+  delete h2d_dt_e;
+  delete h1d_e;
+  delete h1d_t;
   delete h2d_gb_dxdy;
   delete h2d_dxdy;
   delete h1d_gb_dx;
